@@ -1,0 +1,22 @@
+
+
+message addr_info {
+
+	required string addr = 100;
+	required uint32 port = 200;
+}
+
+message addr_map {
+//	required addr_info local = 100;
+	repeated addr_info locals = 100;
+	repeated addr_info remotes = 200;
+}
+
+
+message configure {
+
+	repeated addr_map maps = 100;
+	
+	required uint32 run_as_daemon = 200;                           //后台运行
+	optional string server_crash_run = 320;
+}

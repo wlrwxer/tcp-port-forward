@@ -7,10 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		050D37382154EA7000C68851 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 29E66D23186930FA00C4F48C /* main.cpp */; };
+		0565B5362154BF0D00A52F2F /* evp-encrypt-using.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 0565B5352154BF0D00A52F2F /* evp-encrypt-using.hpp */; };
 		295C1B9818C8E83200BEDCCB /* configure.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 295C1B9718C8E83200BEDCCB /* configure.cpp */; };
 		295C1B9B18C8E87100BEDCCB /* configure.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 295C1B9918C8E87100BEDCCB /* configure.pb.cc */; };
 		29E66D1D186930E800C4F48C /* tcp_port_forward.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 29E66D1C186930E800C4F48C /* tcp_port_forward.1 */; };
-		29E66D24186930FA00C4F48C /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 29E66D23186930FA00C4F48C /* main.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,6 +28,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		050D37322154C53F00C68851 /* evp-encrypt.cxx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = "evp-encrypt.cxx"; path = "../../evp-encrypt.cxx"; sourceTree = "<group>"; };
+		0565B5352154BF0D00A52F2F /* evp-encrypt-using.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = "evp-encrypt-using.hpp"; path = "../../evp-encrypt-using.hpp"; sourceTree = "<group>"; };
 		295C1B9618C8E83200BEDCCB /* configure.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = configure.h; path = ../../configure.h; sourceTree = "<group>"; };
 		295C1B9718C8E83200BEDCCB /* configure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = configure.cpp; path = ../../configure.cpp; sourceTree = "<group>"; };
 		295C1B9918C8E87100BEDCCB /* configure.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = configure.pb.cc; path = ../../configure.pb.cc; sourceTree = "<group>"; };
@@ -69,6 +72,8 @@
 		29E66D19186930E800C4F48C /* tcp_port_forward */ = {
 			isa = PBXGroup;
 			children = (
+				050D37322154C53F00C68851 /* evp-encrypt.cxx */,
+				0565B5352154BF0D00A52F2F /* evp-encrypt-using.hpp */,
 				29AE535818DAABC0009FA9A3 /* l.lua */,
 				295C1B9D18C8F9DF00BEDCCB /* local.lua */,
 				295C1B9C18C8E8F600BEDCCB /* configure.proto */,
@@ -134,7 +139,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				295C1B9818C8E83200BEDCCB /* configure.cpp in Sources */,
-				29E66D24186930FA00C4F48C /* main.cpp in Sources */,
+				0565B5362154BF0D00A52F2F /* evp-encrypt-using.hpp in Sources */,
+				050D37382154EA7000C68851 /* main.cpp in Sources */,
 				295C1B9B18C8E87100BEDCCB /* configure.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -226,6 +232,7 @@
 					"-DENABLE_FETAL",
 					"-DENABLE_LOG4CPLUS",
 					"-I/usr/local/include/lua5.1",
+					"-I/usr/local/opt/openssl/include",
 				);
 				OTHER_LDFLAGS = (
 					"-L/usr/local/lib",
@@ -261,6 +268,7 @@
 					"-DENABLE_FETAL",
 					"-DENABLE_LOG4CPLUS",
 					"-I/usr/local/include/lua5.1",
+					"-I/usr/local/opt/openssl/include",
 				);
 				OTHER_LDFLAGS = (
 					"-L/usr/local/lib",

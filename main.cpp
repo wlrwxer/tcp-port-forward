@@ -15,18 +15,21 @@
 #include <boost/asio.hpp>
 #include <boost/regex.hpp>
 #include <boost/format.hpp>
-#include "message_block.hpp"
-#include "helper.hpp"
-
-#include "configure.h"
 
 #include <openssl/ssl.h>
 
+#include "message_block.hpp"
+#include "helper.hpp"
+#include "configure.h"
+
 #include "evp-encrypt-using.hpp"
+
+
+//#define PASSTHROUGH
 
 #define BUFSIZE 256
 
-#pragma pack(push, 4)
+#pragma pack(push, 1)
 
 struct HEAD {
     uint16_t length;
@@ -84,7 +87,7 @@ typedef std::list<shared_ptr_message_block> buffers_list;
 
 typedef std::function<shared_ptr_message_block(shared_ptr_message_block)> preprocesser_f;
 
-typedef std::tuple<shared_ptr_socket, buffers_list, preprocesser_f> forwared_peer_context;
+typedef std::tuple<shared_ptr_socket, buffers_list, preprocesser_f, std::string> forwared_peer_context;
 
 template<typename C>
 class forward_peer : public std::enable_shared_from_this<forward_peer<C>> {
@@ -103,7 +106,7 @@ public:
     forward_peer(boost::asio::io_service& io_service, C ep)
     : io_service_(io_service)
     , forward_endport_(ep)
-    , pool_(1024 * 128)
+    , pool_(1024 * 1024 * 2)
     , uid_(0) {}
     
     ~forward_peer() {}
@@ -112,81 +115,79 @@ public:
 private:
     
     
-    std::shared_ptr<message_block> on_incoming_data_handler_decrypt(std::shared_ptr<message_block> data)
-    
-    {
+    shared_ptr_message_block on_incoming_data_handler_decrypt(shared_ptr_message_block data) {
         
+        std::cout << "on_incoming_data_handler_decrypt" << std::endl;
+        
+        // not allowed a packet which size exceed 2MB
+        if (pool_.length() + data->length() > pool_.capacity()) {
+            std::cout << "on_incoming_data_handler_decrypt packet tooooooo length" << std::endl;
+            return nullptr;
+        }
+
         pool_ << *data;
         
         if (pool_.length() < sizeof(HEAD)) {
+            std::cout << "on_incoming_data_handler_decrypt not enough length" << std::endl;
             return nullptr;
         }
         
-        auto const h = pool_.reference<HEAD>();
+        auto const header = pool_.reference<HEAD>();
         
         if (!has_uid()) {
             
-            
-            
-            uid_ = h.uid;
+            uid_ = header.uid;
             
         }
         
-        if (pool_.length() < h.length) {
+        if (pool_.length() < header.length) {
+            std::cout << "on_incoming_data_handler_decrypt not enough data" << std::endl;
             return nullptr;
         }
         
-        //do decrypt here
+        // do data decrypt here
         
-        HEAD dummy;
-        pool_ >> dummy;
+        secure_string plain_text;
+        secure_string cipher_text(pool_.rd_ptr() + sizeof(HEAD), header.length - sizeof(HEAD));
         
-        secure_string ptext;
-        secure_string ctext(pool_.rd_ptr(), pool_.length());
+        evp_encrypt_aes_256_cfb engine;
         
-        evp_encrypt_aes_256_cfb e;
+        engine.decrypt(cipher_text, plain_text);
         
-        e.decrypt(ctext, ptext);
-        
-        auto r = message_block::from_size(ptext.length());
+        auto r = message_block::from_size(plain_text.length());
        
-        r->copy(ptext.data(), ptext.length());
+        r->copy(plain_text.data(), plain_text.length());
         
-        pool_.rd_ptr(h.length);
-//        return mess
+        pool_.rd_ptr(header.length);
+        
+        pool_.crunch();
+        
         return r;
     }
     
     
-    std::shared_ptr<message_block> on_outgoing_data_handler_encrypt(std::shared_ptr<message_block> data)
-//                                                                           ,
-//                                                                    std::shared_ptr<forwared_peer_context> receiver,
-//                                                                    std::shared_ptr<forwared_peer_context> sender)
-    
-    {
+    shared_ptr_message_block on_outgoing_data_handler_encrypt(shared_ptr_message_block data) {
+
+        std::cout << "on_outgoing_data_handler_encrypt" << std::endl;
+
+        secure_string cipher_text;
+        secure_string plain_text(data->rd_ptr(), data->length());
         
+        evp_encrypt_aes_256_cfb engine;
         
-        secure_string ctext;
-        secure_string ptext(data->rd_ptr(), data->length());
-        
-        evp_encrypt_aes_256_cfb e;
-        
-        e.encrypt(ptext, ctext);
-        
-        auto r = message_block::from_size(ctext.length() + 2 + 8);
-        
-        r->copy(ctext.data(), ctext.length());
-        
-        
+        engine.encrypt(plain_text, cipher_text);
+
+        auto result = message_block::from_size(sizeof(HEAD) + cipher_text.length());
+
         assert(has_uid());
         
-        HEAD h = { uint16_t(sizeof(HEAD) + ctext.length()), uid_};
+        HEAD header = { uint16_t(sizeof(HEAD) + cipher_text.length()), uid_};
         
-        *r << h << uint64_t(uid_);
+        *result << header;
         
-        *r << ctext;
-        return r;
-
+        result->copy(cipher_text.data(), cipher_text.length());
+        
+        return result;
     }
     
 private:
@@ -231,6 +232,7 @@ public:
         if (ec) {
             print_error("forward_peer::async_connect_handler failure %d, retry next element.\n", ec.value());
             
+#if !defined(PASSTHROUGH)
             
             preprocesser_f encrypt = std::bind(&forward_peer::on_outgoing_data_handler_encrypt,
                                                std::enable_shared_from_this<THIS_T>::shared_from_this(),
@@ -239,8 +241,20 @@ public:
                                                std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                                std::placeholders::_1);
             
-            if (iterator != boost::asio::ip::tcp::resolver::iterator())
-            {
+#else
+            
+            preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
+                return data;
+            }, std::placeholders::_1);
+            
+            preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
+                return data;
+            }, std::placeholders::_1);
+            
+#endif
+            
+            
+            if (iterator != boost::asio::ip::tcp::resolver::iterator()) {
                 auto timer(std::make_shared<boost::asio::deadline_timer>(io_service_));
                 timer->expires_from_now(boost::posix_time::seconds(1));
                 std::weak_ptr<boost::asio::deadline_timer> wptr_timer = timer;
@@ -249,17 +263,15 @@ public:
                 forward_peer->async_connect(epp,
                                             std::bind(&forward_peer::async_connect_handler_2,
                                                       std::enable_shared_from_this<THIS_T>::shared_from_this(),
-                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt)),
-                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt)),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
                                                       wptr_timer,
                                                       std::placeholders::_1,
                                                       ++iterator,
                                                       forward_peer,
                                                       incoming_peer));
                 
-            }
-            else
-            {
+            } else {
                 
                 startup(std::get<0>(*receiver));
             }
@@ -285,12 +297,26 @@ public:
         
         
         
+#if !defined(PASSTHROUGH)
+        
         preprocesser_f encrypt = std::bind(&forward_peer::on_outgoing_data_handler_encrypt,
                                            std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                            std::placeholders::_1);
         preprocesser_f decrypt = std::bind(&forward_peer::on_incoming_data_handler_decrypt,
                                            std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                            std::placeholders::_1);
+        
+#else
+        
+        preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
+            return data;
+        }, std::placeholders::_1);
+        
+        preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
+            return data;
+        }, std::placeholders::_1);
+        
+#endif
 
         
         std::pair<std::string, uint32_t>& endp = forward_endport_();
@@ -305,8 +331,8 @@ public:
             forward_peer->async_connect(epp,
                                         std::bind(&forward_peer::async_connect_handler,
                                                   std::enable_shared_from_this<THIS_T>::shared_from_this(),
-                                                  std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt)),
-                                                  std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt)),
+                                                  std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
+                                                                                          std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
                                                   wptr_timer,
                                                   std::placeholders::_1));
             
@@ -329,18 +355,15 @@ public:
                 forward_peer->async_connect(epp,
                                             std::bind(&forward_peer::async_connect_handler_2,
                                                       std::enable_shared_from_this<THIS_T>::shared_from_this(),
-                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt)),
-                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt)),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
                                                       wptr_timer,
                                                       std::placeholders::_1,
                                                       ++iterator,
                                                       forward_peer,
                                                       incoming_peer));
             }
-            
-            
-            
-            
+
         }
         
         
@@ -371,7 +394,7 @@ public:
                            boost::system::error_code ec,
                            size_t bytes_transferred) {
         if (ec) {
-            print_error("forward_peer::async_send_handler failure %d\n", ec.value());
+            print_error("forward_peer::async_send_handler failure %d %s\n", ec.value(), std::get<3>(*sender).c_str());
             shutdown(std::get<0>(*receiver));
         } else {
             auto &buffer = std::get<1>(*sender).front();
@@ -406,24 +429,26 @@ public:
                               boost::system::error_code ec,
                               size_t bytes_transferred) {
         if (ec || bytes_transferred == 0) {
-            print_error("forward_peer::async_receive_handler failure %d\n", ec.value());
+            print_error("forward_peer::async_receive_handler failure %d %s\n", ec.value(), std::get<3>(*receiver).c_str());
             shutdown(std::get<0>(*sender));
         } else {
             buffer->wr_ptr(bytes_transferred);
-#if 0
-            {
-                char fn[1024];
-                memset(fn, 0, sizeof(fn));
-                sprintf(fn, "%x.bin", &*receiver);
-                
-                FILE *fp = fopen(fn, "ab");
-                assert(fp);
-                auto rc = fwrite(buffer->data().begin(), 1, buffer->size(), fp);
-                assert(rc == buffer->size());
-                fflush(fp);
-                fclose(fp);
-            }
-#endif
+//#if 0
+//            {
+//                char fn[1024];
+//                memset(fn, 0, sizeof(fn));
+//                sprintf(fn, "%x.bin", &*receiver);
+//
+//                FILE *fp = fopen(fn, "ab");
+//                assert(fp);
+//                auto rc = fwrite(buffer->data().begin(), 1, buffer->size(), fp);
+//                assert(rc == buffer->size());
+//                fflush(fp);
+//                fclose(fp);
+//            }
+//#endif
+            
+            std::cout << "receiving data from " << std::get<3>(*receiver) << " " << buffer->length() << " bytes" << std::endl;
             
             async_receive_startup(receiver, sender);
             
@@ -443,7 +468,7 @@ public:
                                                                std::placeholders::_1,
                                                                std::placeholders::_2));
                 } else {
-                    buffers.push_back(buffer);
+                    buffers.push_back(buffer1);
                 }
             }
         }
@@ -455,13 +480,12 @@ private:
     C forward_endport_;
 };
 
-int main(int argc, const char * argv[])
-{
+int main(int argc, const char * argv[]) {
+    
     if (argc < 2) {
         printf("USAGE:%s configure.lua\n", argv[0]);
         return 0;
     }
-    
     
     if (global::instance().update_configure_from_lua(argv[1])) {
         fprintf(stderr, "::main can not load configure from lua.\n");
@@ -481,15 +505,18 @@ int main(int argc, const char * argv[])
     
     print_info("::main startup ...\n");
     
-    
-    std::array<boost::asio::io_service, 8> io_services;
-    for (auto &x: io_services) {
-        new boost::asio::io_service::work(x);
+    std::vector<boost::asio::io_service*> io_services;
+    for (auto i = 0; i < global::instance().configure().nb_services(); ++i) {
+        
+        io_services.push_back(new boost::asio::io_service());
+        new boost::asio::io_service::work(*io_services.back());
+        
     }
+
     
-    auto xf = [](std::array<boost::asio::io_service, 8> &ios) ->boost::asio::io_service& {
+    auto xf = [](std::vector<boost::asio::io_service*> &ios) ->boost::asio::io_service& {
         static std::size_t index = 0;
-        return ios[++index % ios.size()];
+        return *ios[++index % ios.size()];
     };
     
     typedef std::tuple<std::pair<std::string, uint32_t>, std::shared_ptr<std::atomic<uint64_t>>> element;
@@ -546,62 +573,62 @@ int main(int argc, const char * argv[])
                                                                      std::make_shared<std::atomic<uint32_t>>(0)));
                 acceptor->startup_async_accept();
             }
-            struct __helper {
-                static void on_timer(std::shared_ptr<boost::asio::deadline_timer> timer,
-                                     const ::addr_map &am,
-                                     std::shared_ptr<endpoints> peps,
-                                     std::shared_ptr<std::atomic<uint64_t>> total_dispatched,
-                                     const boost::system::error_code& ec) {
-                    if (ec) {
-                        print_error("::main::__helper::on_timer %d\n", ec.value());
-                    } else {
-                        std::string s;
-                        char buf[1024];
-                        memset(buf, 0, sizeof(buf));
-                        
-                        for (auto i = 0; i < am.locals_size(); ++i) {
-                            sprintf(buf, "%s:%u <- ", am.locals(i).addr().c_str(), am.locals(i).port());
-                            s += buf;
-                        }
-                        
-                        sprintf(buf, "total dispatched times: %lu ", total_dispatched->load());
-                        
-                        s += buf;
-                        
-                        for (auto &x: *peps) {
-                            memset(buf, 0, sizeof(buf));
-                            sprintf(buf, "-> %s:%u %lu ", std::get<0>(x).first.c_str(),
-                                    std::get<0>(x).second,
-                                    std::get<1>(x)->load());
-                            s += buf;
-                        }
-                        
-                        print_info("%s ", s.c_str());
-                        
-                        
-                        timer->expires_from_now(boost::posix_time::seconds(10));
-                        timer->async_wait(std::bind(__helper::on_timer,
-                                                    timer,
-                                                    std::ref(am),
-                                                    peps,
-                                                    total_dispatched,
-                                                    std::placeholders::_1));
-                        
-                    }
-                    
-                    
-                }
-            };
-            
-            
-            auto timer(std::make_shared<boost::asio::deadline_timer>(xf(io_services)));
-            timer->expires_from_now(boost::posix_time::seconds(1));
-            timer->async_wait(std::bind(__helper::on_timer,
-                                        timer,
-                                        std::ref(global::instance().configure().maps(i)),
-                                        provider,
-                                        total_dispatched,
-                                        std::placeholders::_1));
+//            struct __helper {
+//                static void on_timer(std::shared_ptr<boost::asio::deadline_timer> timer,
+//                                     const ::addr_map &am,
+//                                     std::shared_ptr<endpoints> peps,
+//                                     std::shared_ptr<std::atomic<uint64_t>> total_dispatched,
+//                                     const boost::system::error_code& ec) {
+//                    if (ec) {
+//                        print_error("::main::__helper::on_timer %d\n", ec.value());
+//                    } else {
+//                        std::string s;
+//                        char buf[1024];
+//                        memset(buf, 0, sizeof(buf));
+//
+//                        for (auto i = 0; i < am.locals_size(); ++i) {
+//                            sprintf(buf, "%s:%u <- ", am.locals(i).addr().c_str(), am.locals(i).port());
+//                            s += buf;
+//                        }
+//
+//                        sprintf(buf, "total dispatched times: %lu ", total_dispatched->load());
+//
+//                        s += buf;
+//
+//                        for (auto &x: *peps) {
+//                            memset(buf, 0, sizeof(buf));
+//                            sprintf(buf, "-> %s:%u %lu ", std::get<0>(x).first.c_str(),
+//                                    std::get<0>(x).second,
+//                                    std::get<1>(x)->load());
+//                            s += buf;
+//                        }
+//
+//                        print_info("%s ", s.c_str());
+//
+//
+//                        timer->expires_from_now(boost::posix_time::seconds(10));
+//                        timer->async_wait(std::bind(__helper::on_timer,
+//                                                    timer,
+//                                                    std::ref(am),
+//                                                    peps,
+//                                                    total_dispatched,
+//                                                    std::placeholders::_1));
+//
+//                    }
+//
+//
+//                }
+//            };
+//
+//
+//            auto timer(std::make_shared<boost::asio::deadline_timer>(xf(io_services)));
+//            timer->expires_from_now(boost::posix_time::seconds(1));
+//            timer->async_wait(std::bind(__helper::on_timer,
+//                                        timer,
+//                                        std::ref(global::instance().configure().maps(i)),
+//                                        provider,
+//                                        total_dispatched,
+//                                        std::placeholders::_1));
         }
     }
     
@@ -611,10 +638,10 @@ int main(int argc, const char * argv[])
     
     for (auto i = 0; i < io_services.size() - 1; ++i) {
         static auto f = static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run);
-        boost::asio::io_service& io = io_services[i];
+        boost::asio::io_service& io = *io_services[i];
         std::thread(std::bind(f, &io)).detach();
     }
-    io_services.back().run();
+    io_services.back()->run();
     return 0;
 }
 

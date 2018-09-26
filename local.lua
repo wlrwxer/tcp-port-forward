@@ -19,6 +19,7 @@ function update_configure(c)
 	r:set_port(1194)
 
 
+    c:set_nb_services(4)
 
     c:set_run_as_daemon(0)                                                          --服务器后台运行 using both
 end

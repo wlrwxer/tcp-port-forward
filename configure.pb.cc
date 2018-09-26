@@ -70,7 +70,8 @@ void protobuf_AssignDesc_configure_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(addr_map));
   configure_descriptor_ = file->message_type(2);
-  static const int configure_offsets_[3] = {
+  static const int configure_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(configure, nb_services_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(configure, maps_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(configure, run_as_daemon_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(configure, server_crash_run_),
@@ -127,9 +128,9 @@ void protobuf_AddDesc_configure_2eproto() {
     "\n\017configure.proto\"(\n\taddr_info\022\014\n\004addr\030d"
     " \002(\t\022\r\n\004port\030\310\001 \002(\r\"D\n\010addr_map\022\032\n\006local"
     "s\030d \003(\0132\n.addr_info\022\034\n\007remotes\030\310\001 \003(\0132\n."
-    "addr_info\"W\n\tconfigure\022\027\n\004maps\030d \003(\0132\t.a"
-    "ddr_map\022\026\n\rrun_as_daemon\030\310\001 \002(\r\022\031\n\020serve"
-    "r_crash_run\030\300\002 \001(\t", 218);
+    "addr_info\"l\n\tconfigure\022\023\n\013nb_services\030c "
+    "\002(\r\022\027\n\004maps\030d \003(\0132\t.addr_map\022\026\n\rrun_as_d"
+    "aemon\030\310\001 \002(\r\022\031\n\020server_crash_run\030\300\002 \001(\t", 239);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "configure.proto", &protobuf_RegisterTypes);
   addr_info::default_instance_ = new addr_info();
@@ -696,6 +697,7 @@ void addr_map::Swap(addr_map* other) {
 // ===================================================================
 
 #ifndef _MSC_VER
+const int configure::kNbServicesFieldNumber;
 const int configure::kMapsFieldNumber;
 const int configure::kRunAsDaemonFieldNumber;
 const int configure::kServerCrashRunFieldNumber;
@@ -720,6 +722,7 @@ configure::configure(const configure& from)
 void configure::SharedCtor() {
   ::google::protobuf::internal::GetEmptyString();
   _cached_size_ = 0;
+  nb_services_ = 0u;
   run_as_daemon_ = 0u;
   server_crash_run_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -760,14 +763,28 @@ configure* configure::New() const {
 }
 
 void configure::Clear() {
-  if (_has_bits_[0 / 32] & 6) {
-    run_as_daemon_ = 0u;
+#define OFFSET_OF_FIELD_(f) (reinterpret_cast<char*>(      \
+  &reinterpret_cast<configure*>(16)->f) - \
+   reinterpret_cast<char*>(16))
+
+#define ZR_(first, last) do {                              \
+    size_t f = OFFSET_OF_FIELD_(first);                    \
+    size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
+    ::memset(&first, 0, n);                                \
+  } while (0)
+
+  if (_has_bits_[0 / 32] & 13) {
+    ZR_(nb_services_, run_as_daemon_);
     if (has_server_crash_run()) {
       if (server_crash_run_ != &::google::protobuf::internal::GetEmptyStringAlreadyInited()) {
         server_crash_run_->clear();
       }
     }
   }
+
+#undef OFFSET_OF_FIELD_
+#undef ZR_
+
   maps_.Clear();
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -783,6 +800,20 @@ bool configure::MergePartialFromCodedStream(
     tag = p.first;
     if (!p.second) goto handle_unusual;
     switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // required uint32 nb_services = 99;
+      case 99: {
+        if (tag == 792) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
+                 input, &nb_services_)));
+          set_has_nb_services();
+        } else {
+          goto handle_unusual;
+        }
+        if (input->ExpectTag(802)) goto parse_maps;
+        break;
+      }
+
       // repeated .addr_map maps = 100;
       case 100: {
         if (tag == 802) {
@@ -854,6 +885,11 @@ failure:
 void configure::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // @@protoc_insertion_point(serialize_start:configure)
+  // required uint32 nb_services = 99;
+  if (has_nb_services()) {
+    ::google::protobuf::internal::WireFormatLite::WriteUInt32(99, this->nb_services(), output);
+  }
+
   // repeated .addr_map maps = 100;
   for (int i = 0; i < this->maps_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
@@ -885,6 +921,11 @@ void configure::SerializeWithCachedSizes(
 ::google::protobuf::uint8* configure::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // @@protoc_insertion_point(serialize_to_array_start:configure)
+  // required uint32 nb_services = 99;
+  if (has_nb_services()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(99, this->nb_services(), target);
+  }
+
   // repeated .addr_map maps = 100;
   for (int i = 0; i < this->maps_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
@@ -919,7 +960,14 @@ void configure::SerializeWithCachedSizes(
 int configure::ByteSize() const {
   int total_size = 0;
 
-  if (_has_bits_[1 / 32] & (0xffu << (1 % 32))) {
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    // required uint32 nb_services = 99;
+    if (has_nb_services()) {
+      total_size += 2 +
+        ::google::protobuf::internal::WireFormatLite::UInt32Size(
+          this->nb_services());
+    }
+
     // required uint32 run_as_daemon = 200;
     if (has_run_as_daemon()) {
       total_size += 2 +
@@ -969,7 +1017,10 @@ void configure::MergeFrom(const ::google::protobuf::Message& from) {
 void configure::MergeFrom(const configure& from) {
   GOOGLE_CHECK_NE(&from, this);
   maps_.MergeFrom(from.maps_);
-  if (from._has_bits_[1 / 32] & (0xffu << (1 % 32))) {
+  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (from.has_nb_services()) {
+      set_nb_services(from.nb_services());
+    }
     if (from.has_run_as_daemon()) {
       set_run_as_daemon(from.run_as_daemon());
     }
@@ -993,7 +1044,7 @@ void configure::CopyFrom(const configure& from) {
 }
 
 bool configure::IsInitialized() const {
-  if ((_has_bits_[0] & 0x00000002) != 0x00000002) return false;
+  if ((_has_bits_[0] & 0x00000005) != 0x00000005) return false;
 
   if (!::google::protobuf::internal::AllAreInitialized(this->maps())) return false;
   return true;
@@ -1001,6 +1052,7 @@ bool configure::IsInitialized() const {
 
 void configure::Swap(configure* other) {
   if (other != this) {
+    std::swap(nb_services_, other->nb_services_);
     maps_.Swap(&other->maps_);
     std::swap(run_as_daemon_, other->run_as_daemon_);
     std::swap(server_crash_run_, other->server_crash_run_);

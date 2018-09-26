@@ -14,6 +14,8 @@ message addr_map {
 
 
 message configure {
+    
+    required uint32 nb_services = 99;
 
 	repeated addr_map maps = 100;
 	

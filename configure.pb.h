@@ -279,6 +279,13 @@ class configure : public ::google::protobuf::Message {
 
   // accessors -------------------------------------------------------
 
+  // required uint32 nb_services = 99;
+  inline bool has_nb_services() const;
+  inline void clear_nb_services();
+  static const int kNbServicesFieldNumber = 99;
+  inline ::google::protobuf::uint32 nb_services() const;
+  inline void set_nb_services(::google::protobuf::uint32 value);
+
   // repeated .addr_map maps = 100;
   inline int maps_size() const;
   inline void clear_maps();
@@ -312,6 +319,8 @@ class configure : public ::google::protobuf::Message {
 
   // @@protoc_insertion_point(class_scope:configure)
  private:
+  inline void set_has_nb_services();
+  inline void clear_has_nb_services();
   inline void set_has_run_as_daemon();
   inline void clear_has_run_as_daemon();
   inline void set_has_server_crash_run();
@@ -322,8 +331,9 @@ class configure : public ::google::protobuf::Message {
   ::google::protobuf::uint32 _has_bits_[1];
   mutable int _cached_size_;
   ::google::protobuf::RepeatedPtrField< ::addr_map > maps_;
-  ::std::string* server_crash_run_;
+  ::google::protobuf::uint32 nb_services_;
   ::google::protobuf::uint32 run_as_daemon_;
+  ::std::string* server_crash_run_;
   friend void  protobuf_AddDesc_configure_2eproto();
   friend void protobuf_AssignDesc_configure_2eproto();
   friend void protobuf_ShutdownFile_configure_2eproto();
@@ -506,6 +516,30 @@ addr_map::mutable_remotes() {
 
 // configure
 
+// required uint32 nb_services = 99;
+inline bool configure::has_nb_services() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void configure::set_has_nb_services() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void configure::clear_has_nb_services() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void configure::clear_nb_services() {
+  nb_services_ = 0u;
+  clear_has_nb_services();
+}
+inline ::google::protobuf::uint32 configure::nb_services() const {
+  // @@protoc_insertion_point(field_get:configure.nb_services)
+  return nb_services_;
+}
+inline void configure::set_nb_services(::google::protobuf::uint32 value) {
+  set_has_nb_services();
+  nb_services_ = value;
+  // @@protoc_insertion_point(field_set:configure.nb_services)
+}
+
 // repeated .addr_map maps = 100;
 inline int configure::maps_size() const {
   return maps_.size();
@@ -538,13 +572,13 @@ configure::mutable_maps() {
 
 // required uint32 run_as_daemon = 200;
 inline bool configure::has_run_as_daemon() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
+  return (_has_bits_[0] & 0x00000004u) != 0;
 }
 inline void configure::set_has_run_as_daemon() {
-  _has_bits_[0] |= 0x00000002u;
+  _has_bits_[0] |= 0x00000004u;
 }
 inline void configure::clear_has_run_as_daemon() {
-  _has_bits_[0] &= ~0x00000002u;
+  _has_bits_[0] &= ~0x00000004u;
 }
 inline void configure::clear_run_as_daemon() {
   run_as_daemon_ = 0u;
@@ -562,13 +596,13 @@ inline void configure::set_run_as_daemon(::google::protobuf::uint32 value) {
 
 // optional string server_crash_run = 320;
 inline bool configure::has_server_crash_run() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
+  return (_has_bits_[0] & 0x00000008u) != 0;
 }
 inline void configure::set_has_server_crash_run() {
-  _has_bits_[0] |= 0x00000004u;
+  _has_bits_[0] |= 0x00000008u;
 }
 inline void configure::clear_has_server_crash_run() {
-  _has_bits_[0] &= ~0x00000004u;
+  _has_bits_[0] &= ~0x00000008u;
 }
 inline void configure::clear_server_crash_run() {
   if (server_crash_run_ != &::google::protobuf::internal::GetEmptyStringAlreadyInited()) {

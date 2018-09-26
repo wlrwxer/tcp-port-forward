@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		050D37382154EA7000C68851 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 29E66D23186930FA00C4F48C /* main.cpp */; };
 		0565B5362154BF0D00A52F2F /* evp-encrypt-using.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 0565B5352154BF0D00A52F2F /* evp-encrypt-using.hpp */; };
+		05E7EC0F215B2B30006E237C /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 29E66D23186930FA00C4F48C /* main.cpp */; };
 		295C1B9818C8E83200BEDCCB /* configure.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 295C1B9718C8E83200BEDCCB /* configure.cpp */; };
 		295C1B9B18C8E87100BEDCCB /* configure.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 295C1B9918C8E87100BEDCCB /* configure.pb.cc */; };
 		29E66D1D186930E800C4F48C /* tcp_port_forward.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 29E66D1C186930E800C4F48C /* tcp_port_forward.1 */; };
@@ -140,7 +140,7 @@
 			files = (
 				295C1B9818C8E83200BEDCCB /* configure.cpp in Sources */,
 				0565B5362154BF0D00A52F2F /* evp-encrypt-using.hpp in Sources */,
-				050D37382154EA7000C68851 /* main.cpp in Sources */,
+				05E7EC0F215B2B30006E237C /* main.cpp in Sources */,
 				295C1B9B18C8E87100BEDCCB /* configure.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

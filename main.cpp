@@ -256,12 +256,14 @@ public:
             
 #else
             
-            preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
-                return data;
+            preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> buffers_list {
+                buffers_list buffers{data};
+                return buffers;
             }, std::placeholders::_1);
             
-            preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
-                return data;
+            preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> buffers_list {
+                buffers_list buffers{data};
+                return buffers;
             }, std::placeholders::_1);
             
 #endif
@@ -326,12 +328,14 @@ public:
         
 #else
         
-        preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
-            return data;
+        preprocesser_f encrypt = std::bind([](shared_ptr_message_block data) -> buffers_list {
+            buffers_list buffers{data};
+            return buffers;
         }, std::placeholders::_1);
         
-        preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> shared_ptr_message_block {
-            return data;
+        preprocesser_f decrypt = std::bind([](shared_ptr_message_block data) -> buffers_list {
+            buffers_list buffers{data};
+            return buffers;
         }, std::placeholders::_1);
         
 #endif

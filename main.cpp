@@ -26,6 +26,7 @@
 
 
 //#define PASSTHROUGH
+//#define REVERSE
 
 #define BUFSIZE 256
 
@@ -85,7 +86,7 @@ public:
 
 typedef std::list<shared_ptr_message_block> buffers_list;
 
-typedef std::function<shared_ptr_message_block(shared_ptr_message_block)> preprocesser_f;
+typedef std::function<buffers_list(shared_ptr_message_block)> preprocesser_f;
 
 typedef std::tuple<shared_ptr_socket, buffers_list, preprocesser_f, std::string> forwared_peer_context;
 
@@ -107,7 +108,7 @@ public:
     : io_service_(io_service)
     , forward_endport_(ep)
     , pool_(1024 * 1024 * 2)
-    , uid_(0) {}
+    , uid_(1) {}
     
     ~forward_peer() {}
     
@@ -115,60 +116,71 @@ public:
 private:
     
     
-    shared_ptr_message_block on_incoming_data_handler_decrypt(shared_ptr_message_block data) {
+    buffers_list on_incoming_data_handler_decrypt(shared_ptr_message_block data) {
         
         std::cout << "on_incoming_data_handler_decrypt" << std::endl;
         
+        buffers_list buffers;
+
         // not allowed a packet which size exceed 2MB
         if (pool_.length() + data->length() > pool_.capacity()) {
             std::cout << "on_incoming_data_handler_decrypt packet tooooooo length" << std::endl;
-            return nullptr;
+            return buffers;
         }
 
         pool_ << *data;
         
-        if (pool_.length() < sizeof(HEAD)) {
-            std::cout << "on_incoming_data_handler_decrypt not enough length" << std::endl;
-            return nullptr;
-        }
         
-        auto const header = pool_.reference<HEAD>();
         
-        if (!has_uid()) {
+        while (true) {
+            if (pool_.length() < sizeof(HEAD)) {
+                std::cout << "on_incoming_data_handler_decrypt not enough length " << pool_.length() << std::endl;
+                break;
+            }
             
-            uid_ = header.uid;
+            auto const header = pool_.reference<HEAD>();
+            
+            if (!has_uid()) {
+                
+                uid_ = header.uid;
+                
+            }
+            
+            if (pool_.length() < header.length) {
+                std::cout << "on_incoming_data_handler_decrypt not enough data" << std::endl;
+                break;
+            }
+            
+            // do data decrypt here
+            
+            secure_string plain_text;
+            secure_string cipher_text(pool_.rd_ptr() + sizeof(HEAD), header.length - sizeof(HEAD));
+            
+            evp_encrypt_aes_256_cfb engine;
+            
+            engine.decrypt(cipher_text, plain_text);
+            
+            auto r = message_block::from_size(plain_text.length());
+            
+            r->copy(plain_text.data(), plain_text.length());
+            
+            buffers.push_back(r);
+            
+            pool_.rd_ptr(header.length);
             
         }
-        
-        if (pool_.length() < header.length) {
-            std::cout << "on_incoming_data_handler_decrypt not enough data" << std::endl;
-            return nullptr;
-        }
-        
-        // do data decrypt here
-        
-        secure_string plain_text;
-        secure_string cipher_text(pool_.rd_ptr() + sizeof(HEAD), header.length - sizeof(HEAD));
-        
-        evp_encrypt_aes_256_cfb engine;
-        
-        engine.decrypt(cipher_text, plain_text);
-        
-        auto r = message_block::from_size(plain_text.length());
-       
-        r->copy(plain_text.data(), plain_text.length());
-        
-        pool_.rd_ptr(header.length);
-        
+      
         pool_.crunch();
         
-        return r;
+        return buffers;
     }
     
     
-    shared_ptr_message_block on_outgoing_data_handler_encrypt(shared_ptr_message_block data) {
+    buffers_list on_outgoing_data_handler_encrypt(shared_ptr_message_block data) {
 
         std::cout << "on_outgoing_data_handler_encrypt" << std::endl;
+        
+        buffers_list buffers;
 
         secure_string cipher_text;
         secure_string plain_text(data->rd_ptr(), data->length());
@@ -187,7 +199,8 @@ private:
         
         result->copy(cipher_text.data(), cipher_text.length());
         
-        return result;
+        buffers.push_back(result);
+        return buffers;
     }
     
 private:
@@ -237,7 +250,7 @@ public:
             preprocesser_f encrypt = std::bind(&forward_peer::on_outgoing_data_handler_encrypt,
                                                std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                                std::placeholders::_1);
-            preprocesser_f decrypt = std::bind(&forward_peer::on_incoming_data_handler_decrypt,
+            preprocesser_f decrypt= std::bind(&forward_peer::on_incoming_data_handler_decrypt,
                                                std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                                std::placeholders::_1);
             
@@ -263,8 +276,13 @@ public:
                 forward_peer->async_connect(epp,
                                             std::bind(&forward_peer::async_connect_handler_2,
                                                       std::enable_shared_from_this<THIS_T>::shared_from_this(),
+#if defined(REVERSE)
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), encrypt, std::string(">>>>>"))),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), decrypt, std::string("<<<<<"))),
+#else
                                                       std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
                                                       std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
+#endif
                                                       wptr_timer,
                                                       std::placeholders::_1,
                                                       ++iterator,
@@ -302,9 +320,9 @@ public:
         preprocesser_f encrypt = std::bind(&forward_peer::on_outgoing_data_handler_encrypt,
                                            std::enable_shared_from_this<THIS_T>::shared_from_this(),
                                            std::placeholders::_1);
-        preprocesser_f decrypt = std::bind(&forward_peer::on_incoming_data_handler_decrypt,
-                                           std::enable_shared_from_this<THIS_T>::shared_from_this(),
-                                           std::placeholders::_1);
+        preprocesser_f decrypt= std::bind(&forward_peer::on_incoming_data_handler_decrypt,
+                                          std::enable_shared_from_this<THIS_T>::shared_from_this(),
+                                          std::placeholders::_1);
         
 #else
         
@@ -331,8 +349,13 @@ public:
             forward_peer->async_connect(epp,
                                         std::bind(&forward_peer::async_connect_handler,
                                                   std::enable_shared_from_this<THIS_T>::shared_from_this(),
+#if defined(REVERSE)
+                                                  std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), encrypt, std::string(">>>>>"))),
+                                                  std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), decrypt, std::string("<<<<<"))),
+#else
                                                   std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
-                                                                                          std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
+                                                  std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
+#endif
                                                   wptr_timer,
                                                   std::placeholders::_1));
             
@@ -355,8 +378,13 @@ public:
                 forward_peer->async_connect(epp,
                                             std::bind(&forward_peer::async_connect_handler_2,
                                                       std::enable_shared_from_this<THIS_T>::shared_from_this(),
+#if defined(REVERSE)
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), encrypt, std::string(">>>>>"))),
+                                                      std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), decrypt, std::string("<<<<<"))),
+#else
                                                       std::make_shared<forwared_peer_context>(std::make_tuple(incoming_peer, buffers_list(), decrypt, std::string(">>>>>"))),
                                                       std::make_shared<forwared_peer_context>(std::make_tuple(forward_peer, buffers_list(), encrypt, std::string("<<<<<"))),
+#endif
                                                       wptr_timer,
                                                       std::placeholders::_1,
                                                       ++iterator,
@@ -448,17 +476,21 @@ public:
 //            }
 //#endif
             
-            std::cout << "receiving data from " << std::get<3>(*receiver) << " " << buffer->length() << " bytes" << std::endl;
-            
             async_receive_startup(receiver, sender);
             
-            auto buffer1 = std::get<2>(*receiver)(buffer);
+            auto buffers1 = std::get<2>(*receiver)(buffer);
             
-            if (buffer1) {
+            std::cout << "receiving data from " << std::get<3>(*receiver) << " " << buffer->length() << " bytes, for " << buffers1.size() << " packets" << std::endl;
+            
+
+            if (!buffers1.empty()) {
                 
                 auto &buffers = std::get<1>(*sender);
                 if (buffers.empty()) {
-                    buffers.push_back(buffer1);
+                    for (auto &x: buffers1) {
+                        buffers.push_back(x);
+                    }
+                    
                     auto &buffer = buffers.front();
                     std::get<0>(*sender)->async_send(boost::asio::buffer(buffer->rd_ptr(), buffer->length()),
                                                      std::bind(&forward_peer::async_send_handler,
@@ -468,7 +500,10 @@ public:
                                                                std::placeholders::_1,
                                                                std::placeholders::_2));
                 } else {
-                    buffers.push_back(buffer1);
+                    for (auto &x: buffers1) {
+                        buffers.push_back(x);
+                    }
+//                    buffers.push_back(buffer1);
                 }
             }
         }

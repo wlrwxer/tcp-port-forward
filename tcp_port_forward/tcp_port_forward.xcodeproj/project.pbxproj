@@ -234,6 +234,7 @@
 					"-DENABLE_LOG4CPLUS",
 					"-I/usr/local/include/lua5.1",
 					"-I/usr/local/opt/openssl/include",
+					"-DREVERSE",
 				);
 				OTHER_LDFLAGS = (
 					"-L/usr/local/lib",
@@ -271,6 +272,7 @@
 					"-DENABLE_LOG4CPLUS",
 					"-I/usr/local/include/lua5.1",
 					"-I/usr/local/opt/openssl/include",
+					"-DREVERSE",
 				);
 				OTHER_LDFLAGS = (
 					"-L/usr/local/lib",

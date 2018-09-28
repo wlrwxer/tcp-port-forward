@@ -16,7 +16,7 @@ function update_configure(c)
 
 	r:set_addr("172.105.196.90")
     --r:set_addr("127.0.0.1")
-	r:set_port(1194)
+	r:set_port(2205)
 
 
     c:set_nb_services(4)

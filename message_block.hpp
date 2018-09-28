@@ -51,7 +51,7 @@ public:
 	const std::size_t capacity() const { return &*buffer_base_ptr_ + const_buffer_size_ - wr_ptr_; }
 	const std::size_t length() const { return (wr_ptr_ - rd_ptr_); }
 	bool empty() const { return (wr_ptr_ == rd_ptr_); }
-	char* rd_ptr() const { return rd_ptr_; }
+	const char* rd_ptr() const { return rd_ptr_; }
 	char* wr_ptr() const { return wr_ptr_; }
 public:
 	template<typename T>

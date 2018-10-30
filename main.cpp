@@ -674,6 +674,11 @@ int main(int argc, const char * argv[]) {
     
     print_info("startup asio threads pool ...\n");
     printf    ("startup asio threads pool ...\n");
+#if defined(REVERSE)
+    printf    ("will ecrypt & pack incoming data\n");
+#else
+    printf    ("will decrypt & unpack incoming data\n");
+#endif
     
     for (auto i = 0; i < io_services.size() - 1; ++i) {
         static auto f = static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run);
